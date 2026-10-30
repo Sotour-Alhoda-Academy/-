@@ -519,12 +519,13 @@ function cleanName(s){
 /* أسماء الطالبات لا تحمل أرقام القائمة الأصلية نهائيًا.
    نحذف الأرقام العربية/الإنجليزية في أي مكان داخل الاسم،
    وكذلك الأقواس والنجوم التي كانت تلتصق برقم القائمة. */
-return removeEmojisAndDecorations(String(s).normalize("NFKC")
+let name=removeEmojisAndDecorations(String(s).normalize("NFKC")
 .replace(/[0-9٠-٩]+/g," ")
 .replace(/[()（）*«»\[\]{}]+/g," ")
-.replace(/(قالون|حفص)/gi," ")
-.replace(/\s+/g," ")
-)
+);
+name=name.replace(/(^|\\s)حفص[هة](?=$|\\s)/g,"$1حفصة");
+name=name.replace(/(^|\\s)(?:قالون|حفص)(?=$|\\s)/gi," ");
+return name.replace(/\\s+/g," ").trim()
 }
 function splitStudentsLine(line){
 let raw=line.trim();
@@ -592,7 +593,7 @@ lines.forEach((l,idx)=>{
       return;
     }
     const cleaned=cleanName(raw), words=cleaned.split(/\s+/).filter(Boolean);
-    const prose=/حفص|ورش|بارك|القرآن|القران|قلب|ان شاء|إن شاء|تعالى|حبيبات|الأجر|الاجر|اختبار|سورة|سوره|كتب|فضلا|فضلاً|محتاج|معلمات|طالبات|عدد|تبارك|ما شاء|اللهم|وفق|جزاكم|شكرا|شكراً|بالتوفيق|رحال|السعادة|البركة|هنيئ|تشبعت|امتلأت|ازهرت|قائمة|رفيقات/i;
+    const prose=/(?:^|\\s)(?:حفص|ورش|قالون)(?=$|\\s)|بارك|القرآن|القران|قلب|ان شاء|إن شاء|تعالى|حبيبات|الأجر|الاجر|اختبار|سورة|سوره|كتب|فضلا|فضلاً|محتاج|معلمات|طالبات|عدد|تبارك|ما شاء|اللهم|وفق|جزاكم|شكرا|شكراً|بالتوفيق|رحال|السعادة|البركة|هنيئ|تشبعت|امتلأت|ازهرت|قائمة|رفيقات/i;
     const looksLikeName=/^[ء-ي]+(?:\s+[ء-ي]+){0,5}$/.test(cleaned)&&words.length>=1&&words.length<=6&&!prose.test(cleaned);
     if(looksLikeName){
       const st={name:cleaned,riwayah:hasQalun(raw)?'قالون':'حفص',groupNo:lastNumberedStudent.groupNo,id:uid()};
@@ -894,35 +895,22 @@ function distribute(){
   }
 
   /*
-   * بعد حجز طالبات قالون، كل المعلمات — بما فيهن معلمات قالون —
-   * يدخلن في توزيع طالبات الحفظ حسب السعة المتبقية.
+   * بعد تثبيت طالبات قالون مع المعلمات المختارات،
+   * نوزع طالبات الحفظ على جميع المعلمات حسب العدد الإجمالي
+   * الموجود لدى كل معلمة، وليس حسب عدد طالبات الحفظ وحدهن.
+   * في كل خطوة نختار المعلمة الأقل عددًا، مع احترام السعة.
+   * وبذلك تظل طالبات قالون مع معلمات قالون، وتُوازن الأعداد
+   * النهائية قدر الإمكان بين جميع المعلمات.
    */
-  // السعة المتبقية بعد حجز طالبات قالون، مع احتساب أي وقت متبقٍ لمعلمة قالون للحفظ.
-  const normalGroups=groups.filter(g=>g.capacity>g.students.length);
-  const normalCap=normalGroups.reduce((a,g)=>a+Math.max(0,g.capacity-g.students.length),0);
+  const normalCap=groups.reduce((a,g)=>a+Math.max(0,g.capacity-g.students.length),0);
   if(normalStudents.length>normalCap)throw new Error("إجمالي وقت المعلمات لا يكفي عدد طالبات الحفظ المتبقية.");
 
-  /*
-   * الطالبات العاديات: حساب توزيع متوازن أولًا، ثم توزيع متسلسل.
-   * كل معلمة تأخذ مجموعة متتالية من قائمة الطالبات العاديات.
-   */
-  const targets=normalGroups.map(()=>0);
-  let remaining=normalStudents.length;
-  while(remaining){
-    const active=normalGroups.map((g,i)=>i).filter(i=>targets[i]<(normalGroups[i].capacity-normalGroups[i].students.length));
-    if(!active.length)throw new Error("لم يمكن توزيع كل الطالبات بسبب سعة المواعيد.");
-    const min=Math.min(...active.map(i=>targets[i]));
-    active.filter(i=>targets[i]===min).forEach(i=>{if(remaining){targets[i]++;remaining--;}});
-  }
-
-  let pos=0;
-  for(let gi=0;gi<normalGroups.length;gi++){
-    const g=normalGroups[gi];
-    let normalAssigned=0;
-    while(normalAssigned<targets[gi]&&pos<normalStudents.length){
-      g.students.push(normalStudents[pos++]);
-      normalAssigned++;
-    }
+  for(const st of normalStudents){
+    const available=groups.filter(g=>g.students.length<g.capacity);
+    if(!available.length)throw new Error("لم يمكن توزيع كل الطالبات بسبب سعة المواعيد.");
+    let minCount=Math.min(...available.map(g=>g.students.length));
+    const target=available.find(g=>g.students.length===minCount);
+    target.students.push(st);
   }
 
   const order=new Map(students.map((s,i)=>[s.id,i]));
