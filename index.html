@@ -523,6 +523,9 @@ let name=removeEmojisAndDecorations(String(s).normalize("NFKC")
 .replace(/[0-9٠-٩]+/g," ")
 .replace(/[()（）*«»\[\]{}]+/g," ")
 );
+/* إزالة علامات الترقيم التي تأتي بجوار اسم الرواية، مثل ..(حفص)،
+   حتى لا تمنع قبول اسم الرفيقة في السطر المكمل. */
+name=name.replace(/[.,،؛:：]+/g," ");
 name=name.replace(/(^|\s)حفص[هة](?=$|\s)/g,"$1حفصة");
 name=name.replace(/(^|\s)(?:قالون|حفص)(?=$|\s)/gi," ");
 return name.replace(/\s+/g," ").trim()
