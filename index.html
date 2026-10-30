@@ -334,7 +334,7 @@ function extractTimes(text){
   raw=raw.replace(/(\d{1,2})\s*[.٫]\s*30(?=\s*(?:صباح(?:ا|ً)?|مساء(?:ا|ً)?|ظهر(?:ا|ً)?|عصر(?:ا|ً)?|ليل(?:ا|ً)?|ص|م|ظ|ع|ز|am|pm)\b)/gi,"$1.30");
 
   const P="(?:صباح(?:ا|ً)?|مساء(?:ا|ً)?|ظهر(?:ا|ً)?|عصر(?:ا|ً)?|ليل(?:ا|ً)?|ص|م|ظ|ع|ز|am|pm)";
-  const NUM="(\\d{1,2}(?:\\s*\\.\\s*(?:00|30))?)";
+  const NUM="(\\d{1,2}(?:\s*\\.\s*(?:00|30))?)";
 
   /* أولًا: المدى المكتوب بالنقطتين أو إلى/حتى/الشرطة.
      النقطتان هنا مقصودهما 9:10 = 9 إلى 10، لا 9:10 دقيقة. */
@@ -346,7 +346,7 @@ function extractTimes(text){
     if(a!==null)return {start:a,end:a+60,explicit:false};
   }
 
-const COLONNUM="(\\d{1,2}(?:\\s*[.\\u066b]\\s*(?:00|30|[0-5]?\\d))?)";
+const COLONNUM="(\\d{1,2}(?:\s*[.\\u066b]\s*(?:00|30|[0-5]?\\d))?)";
        const colonHalfRange=/\b(\d{1,2})\s*:\s*(\d{1,2})\s*\.\s*5\s*(صباح(?:ا|ً)?|مساء(?:ا|ً)?|ظهر(?:ا|ً)?|عصر(?:ا|ً)?|ليل(?:ا|ً)?|ص|م|ظ|ع|ز|am|pm)?\b/i;
   let ch=raw.match(colonHalfRange);
   if(ch){
@@ -360,7 +360,7 @@ const COLONNUM="(\\d{1,2}(?:\\s*[.\\u066b]\\s*(?:00|30|[0-5]?\\d))?)";
     }
   }
 
-const colonRange=new RegExp(COLONNUM+"\\s*:\\s*"+COLONNUM+"\\s*("+P+")?","i");
+const colonRange=new RegExp(COLONNUM+"\s*:\s*"+COLONNUM+"\s*("+P+")?","i");
   let m=raw.match(colonRange);
   if(m){
     let suffix=m[3]||"";
@@ -381,8 +381,8 @@ const colonRange=new RegExp(COLONNUM+"\\s*:\\s*"+COLONNUM+"\\s*("+P+")?","i");
   }
 
   const rangeRe=new RegExp(
-    NUM+"\\s*("+P+")?\\s*(?:إلى|الى|الي|حتى|من|ل|-)\\s*"+
-    NUM+"\\s*("+P+")?","i"
+    NUM+"\s*("+P+")?\s*(?:إلى|الى|الي|حتى|من|ل|-)\s*"+
+    NUM+"\s*("+P+")?","i"
   );
   m=raw.match(rangeRe);
   if(m){
@@ -404,7 +404,7 @@ const colonRange=new RegExp(COLONNUM+"\\s*:\\s*"+COLONNUM+"\\s*("+P+")?","i");
   }
 
   /* وقت واحد: 9 أو 9.30 أو ٩٫٣٠ أو 9 ونص = ساعة واحدة كاملة. */
-  const halfRe=new RegExp("(?:^|[^0-9])"+NUM+"\\s*(?:و\\s*نص|ونص|و\\s*نصف|ونصف)?\\s*("+P+")?(?=$|[^0-9])","i");
+  const halfRe=new RegExp("(?:^|[^0-9])"+NUM+"\s*(?:و\s*نص|ونص|و\s*نصف|ونصف)?\s*("+P+")?(?=$|[^0-9])","i");
   m=raw.match(halfRe);
   if(m){
     let val=m[1].replace(/\s/g,"");
@@ -465,7 +465,7 @@ if(prefixMatches.length>1)return {ambiguous:true,names:prefixMatches.map(x=>x.na
 let candidates=[];
 for(const t of teachers){
 let first=norm(t.name).split(" ")[0];
-if(first&&new RegExp("(^|\\s|[-–—])"+first+"($|\\s|[-–—])").test(n))candidates.push(t);
+if(first&&new RegExp("(^|\s|[-–—])"+first+"($|\s|[-–—])").test(n))candidates.push(t);
 }
 if(candidates.length===1)return candidates[0];
 if(candidates.length>1)return {ambiguous:true,names:candidates.map(x=>x.name)};
@@ -523,9 +523,9 @@ let name=removeEmojisAndDecorations(String(s).normalize("NFKC")
 .replace(/[0-9٠-٩]+/g," ")
 .replace(/[()（）*«»\[\]{}]+/g," ")
 );
-name=name.replace(/(^|\\s)حفص[هة](?=$|\\s)/g,"$1حفصة");
-name=name.replace(/(^|\\s)(?:قالون|حفص)(?=$|\\s)/gi," ");
-return name.replace(/\\s+/g," ").trim()
+name=name.replace(/(^|\s)حفص[هة](?=$|\s)/g,"$1حفصة");
+name=name.replace(/(^|\s)(?:قالون|حفص)(?=$|\s)/gi," ");
+return name.replace(/\s+/g," ").trim()
 }
 function splitStudentsLine(line){
 let raw=line.trim();
@@ -593,7 +593,7 @@ lines.forEach((l,idx)=>{
       return;
     }
     const cleaned=cleanName(raw), words=cleaned.split(/\s+/).filter(Boolean);
-    const prose=/(?:^|\\s)(?:حفص|ورش|قالون)(?=$|\\s)|بارك|القرآن|القران|قلب|ان شاء|إن شاء|تعالى|حبيبات|الأجر|الاجر|اختبار|سورة|سوره|كتب|فضلا|فضلاً|محتاج|معلمات|طالبات|عدد|تبارك|ما شاء|اللهم|وفق|جزاكم|شكرا|شكراً|بالتوفيق|رحال|السعادة|البركة|هنيئ|تشبعت|امتلأت|ازهرت|قائمة|رفيقات/i;
+    const prose=/(?:^|\s)(?:حفص|ورش|قالون)(?=$|\s)|بارك|القرآن|القران|قلب|ان شاء|إن شاء|تعالى|حبيبات|الأجر|الاجر|اختبار|سورة|سوره|كتب|فضلا|فضلاً|محتاج|معلمات|طالبات|عدد|تبارك|ما شاء|اللهم|وفق|جزاكم|شكرا|شكراً|بالتوفيق|رحال|السعادة|البركة|هنيئ|تشبعت|امتلأت|ازهرت|قائمة|رفيقات/i;
     const looksLikeName=/^[ء-ي]+(?:\s+[ء-ي]+){0,5}$/.test(cleaned)&&words.length>=1&&words.length<=6&&!prose.test(cleaned);
     if(looksLikeName){
       const st={name:cleaned,riwayah:hasQalun(raw)?'قالون':'حفص',groupNo:lastNumberedStudent.groupNo,id:uid()};
