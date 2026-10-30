@@ -898,21 +898,33 @@ function distribute(){
   }
 
   /*
-   * بعد تثبيت طالبات قالون مع معلمات قالون المختارات،
-   * نوزع باقي الطالبات بترتيب القائمة على المعلمة الأقل عددًا
-   * في إجمالي الطالبات لديها، مع احتساب طالبات قالون ضمن العدد.
-   * يشمل التوازن جميع المعلمات، بما في ذلك معلمات قالون،
-   * مع احترام السعة، وعند التعادل نلتزم بترتيب المعلمات في الجدول.
+   * نحدد نصيبًا متوازنًا لكل معلمة من إجمالي الطالبات،
+   * ثم نملأ قوائم المعلمات بالترتيب على شكل مجموعات متتالية.
+   * طالبات قالون يُثبتن أولًا عند معلمات قالون، ويُحتسبن
+   * من نصيب المعلمة، ثم نكمل بقية نصيبها من طالبات الحفظ
+   * حسب ترتيب القائمة، قبل الانتقال للمعلمة التالية.
    */
+  const base=Math.floor(total/groups.length);
+  const remainder=total%groups.length;
+  const targets=groups.map((g,i)=>base+(i<remainder?1:0));
   const normalCap=groups.reduce((a,g)=>a+Math.max(0,g.capacity-g.students.length),0);
   if(normalStudents.length>normalCap)throw new Error("إجمالي وقت المعلمات لا يكفي عدد طالبات الحفظ المتبقية.");
 
-  for(const st of normalStudents){
+  let ni=0;
+  groups.forEach((g,i)=>{
+    const wanted=Math.max(0,targets[i]-g.students.length);
+    const take=Math.min(wanted,normalStudents.length-ni,Math.max(0,g.capacity-g.students.length));
+    for(let j=0;j<take;j++)g.students.push(normalStudents[ni++]);
+  });
+
+  /* إذا زاد عدد طالبات قالون عند معلمة عن نصيبها المستهدف،
+     نوزع المتبقي في كتل متتابعة على الأقل عددًا مع احترام السعة. */
+  while(ni<normalStudents.length){
     const available=groups.filter(g=>g.students.length<g.capacity);
     if(!available.length)throw new Error("لم يمكن توزيع كل الطالبات بسبب سعة المواعيد.");
     const minCount=Math.min(...available.map(g=>g.students.length));
     const target=available.find(g=>g.students.length===minCount);
-    target.students.push(st);
+    target.students.push(normalStudents[ni++]);
   }
 
   const order=new Map(students.map((s,i)=>[s.id,i]));
