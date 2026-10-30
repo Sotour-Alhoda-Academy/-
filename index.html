@@ -899,20 +899,16 @@ function distribute(){
 
   /*
    * بعد تثبيت طالبات قالون مع المعلمات المختارات،
-   * نوزع طالبات الحفظ على جميع المعلمات حسب العدد الإجمالي
-   * الموجود لدى كل معلمة، وليس حسب عدد طالبات الحفظ وحدهن.
-   * في كل خطوة نختار المعلمة الأقل عددًا، مع احترام السعة.
-   * وبذلك تظل طالبات قالون مع معلمات قالون، وتُوازن الأعداد
-   * النهائية قدر الإمكان بين جميع المعلمات.
+   * نوزع باقي الطالبات بالتتابع حسب ترتيبهن في القائمة:
+   * نملأ سعة أول معلمة في ترتيب المواعيد، ثم ننتقل للتي تليها.
+   * طالبات قالون يظلن مع معلمات قالون ولا يدخلن في هذا التتابع.
    */
   const normalCap=groups.reduce((a,g)=>a+Math.max(0,g.capacity-g.students.length),0);
   if(normalStudents.length>normalCap)throw new Error("إجمالي وقت المعلمات لا يكفي عدد طالبات الحفظ المتبقية.");
 
   for(const st of normalStudents){
-    const available=groups.filter(g=>g.students.length<g.capacity);
-    if(!available.length)throw new Error("لم يمكن توزيع كل الطالبات بسبب سعة المواعيد.");
-    let minCount=Math.min(...available.map(g=>g.students.length));
-    const target=available.find(g=>g.students.length===minCount);
+    const target=groups.find(g=>g.students.length<g.capacity);
+    if(!target)throw new Error("لم يمكن توزيع كل الطالبات بسبب سعة المواعيد.");
     target.students.push(st);
   }
 
