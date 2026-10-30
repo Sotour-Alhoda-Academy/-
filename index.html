@@ -927,9 +927,8 @@ function distribute(){
     target.students.push(normalStudents[ni++]);
   }
 
-  const order=new Map(students.map((s,i)=>[s.id,i]));
   groups.forEach(g=>{
-    g.students.sort((a,b)=>order.get(a.id)-order.get(b.id));
+    /* نحتفظ بترتيب الإضافة: طالبات قالون أولًا ثم مجموعة الحفظ المتتالية. */
     let cur=g.start;
     g.students.forEach(st=>{st.start=cur;st.end=cur+examDuration;cur+=examDuration;});
     if(g.students.length>g.capacity)g.end=cur;
