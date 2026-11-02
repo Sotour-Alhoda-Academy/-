@@ -352,7 +352,7 @@ function extractTimes(text){
   raw=raw.replace(/(\d{1,2})\s*[.٫]\s*30(?=\s*(?:صباح(?:ا|ً)?|مساء(?:ا|ً)?|ظهر(?:ا|ً)?|عصر(?:ا|ً)?|ليل(?:ا|ً)?|ص|م|ظ|ع|ز|am|pm)\b)/gi,"$1.30");
 
   const P="(?:صباح(?:ا|ً)?|مساء(?:ا|ً)?|ظهر(?:ا|ً)?|عصر(?:ا|ً)?|ليل(?:ا|ً)?|ص|م|ظ|ع|ز|am|pm)";
-  const NUM="(\\d{1,2}(?:\s*\\.\s*(?:00|30))?)";
+  const NUM="(\\d{1,2}(?:\\s*\\.\\s*(?:00|30))?)";
 
   /* أولًا: المدى المكتوب بالنقطتين أو إلى/حتى/الشرطة.
      النقطتان هنا مقصودهما 9:10 = 9 إلى 10، لا 9:10 دقيقة. */
@@ -364,7 +364,7 @@ function extractTimes(text){
     if(a!==null)return {start:a,end:a+60,explicit:false};
   }
 
-const COLONNUM="(\\d{1,2}(?:\s*[.\\u066b]\s*(?:00|30|[0-5]?\\d))?)";
+const COLONNUM="(\\d{1,2}(?:\\s*[.\\u066b]\\s*(?:00|30|[0-5]?\\d))?)";
        const colonHalfRange=/\b(\d{1,2})\s*:\s*(\d{1,2})\s*\.\s*5\s*(صباح(?:ا|ً)?|مساء(?:ا|ً)?|ظهر(?:ا|ً)?|عصر(?:ا|ً)?|ليل(?:ا|ً)?|ص|م|ظ|ع|ز|am|pm)?\b/i;
   let ch=raw.match(colonHalfRange);
   if(ch){
@@ -378,7 +378,7 @@ const COLONNUM="(\\d{1,2}(?:\s*[.\\u066b]\s*(?:00|30|[0-5]?\\d))?)";
     }
   }
 
-const colonRange=new RegExp(COLONNUM+"\s*:\s*"+COLONNUM+"\s*("+P+")?","i");
+const colonRange=new RegExp(COLONNUM+"\\s*:\\s*"+COLONNUM+"\\s*("+P+")?","i");
   let m=raw.match(colonRange);
   if(m){
     let suffix=m[3]||"";
@@ -399,8 +399,8 @@ const colonRange=new RegExp(COLONNUM+"\s*:\s*"+COLONNUM+"\s*("+P+")?","i");
   }
 
   const rangeRe=new RegExp(
-    NUM+"\s*("+P+")?\s*(?:إلى|الى|الي|حتى|من|ل|-)\s*"+
-    NUM+"\s*("+P+")?","i"
+    NUM+"\\s*("+P+")?\\s*(?:إلى|الى|الي|حتى|من|ل|-)\\s*"+
+    NUM+"\\s*("+P+")?","i"
   );
   m=raw.match(rangeRe);
   if(m){
@@ -422,7 +422,7 @@ const colonRange=new RegExp(COLONNUM+"\s*:\s*"+COLONNUM+"\s*("+P+")?","i");
   }
 
   /* وقت واحد: 9 أو 9.30 أو ٩٫٣٠ أو 9 ونص = ساعة واحدة كاملة. */
-  const halfRe=new RegExp("(?:^|[^0-9])"+NUM+"\s*(?:و\s*نص|ونص|و\s*نصف|ونصف)?\s*("+P+")?(?=$|[^0-9])","i");
+  const halfRe=new RegExp("(?:^|[^0-9])"+NUM+"\\s*(?:و\\s*نص|ونص|و\\s*نصف|ونصف)?\\s*("+P+")?(?=$|[^0-9])","i");
   m=raw.match(halfRe);
   if(m){
     let val=m[1].replace(/\s/g,"");
