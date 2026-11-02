@@ -43,6 +43,15 @@ hr{border:0;border-top:1px solid #eee;margin:15px 0}
 /* تم إلغاء شرح الموقع نهائيًا حسب طلب المستخدم */
 #helpFloating,.guide-overlay,.guide-card,.guide-step,.guide-modal{display:none !important;}
 #guide-teachers{display:none !important;}
+
+.schedule-preview-heading{display:flex;flex-direction:column;gap:3px;margin:14px 0 8px;color:#71358b}
+.schedule-preview-scroll{width:100%;overflow-x:auto;border:1px solid #e8e1eb;border-radius:12px;background:#fff}
+.schedule-preview-table{width:100%;min-width:620px;border-collapse:collapse;font-size:13px;text-align:center}
+.schedule-preview-table th,.schedule-preview-table td{padding:10px 8px;border-bottom:1px solid #eee;vertical-align:middle}
+.schedule-preview-table th{background:#f4edf7;color:#71358b;white-space:nowrap}
+.schedule-preview-table td:nth-child(2){text-align:right;min-width:190px;white-space:normal}
+.schedule-preview-table tr:last-child td{border-bottom:0}
+@media(max-width:600px){.schedule-preview-table{font-size:12px}.schedule-preview-table th,.schedule-preview-table td{padding:8px 6px}}
 </style>
 </head>
 <body>
@@ -316,10 +325,10 @@ function extractTimes(text){
     .replace(/[–—−]/g,"-")
     .trim();
   raw=digits(raw);
-  /* توحيد دلالة الوقت قبل استخراجه: صباح/الصبح = ص، وظهر/العصر/المساء = م.
-     يشمل ذلك الكلمات المكتوبة متصلة بالرقم مثل ٧م و١١مساءا. */
+  /* توحيد دلالة الوقت إلى AM/PM قبل أي محاولة لاستخراج الساعة.
+     يدعم الصيغ المختصرة والكاملة، مع أو بدون مسافة، ومع أل والتنوين. */
   raw=raw.replace(/(\d{1,2}(?:\s*[.:]\s*(?:00|30))?)\s*(الصباح|الصبح|صباحا?|المساء|مساءا?|الظهر|ظهرا?|العصر|عصرا?|ص|م|ظ|ع|am|pm)(?=$|[^ء-يA-Za-z])/gi,
-    (whole,num,suffix)=>num+" "+(meridiemKind(suffix)==="am"?"ص":"م"));
+    (whole,num,suffix)=>num+" "+(meridiemKind(suffix)==="am"?"AM":"PM"));
   /* مدى مباشر بالنقطة أو النقطتين: 8.10 / ٨.١٠ / 8..10 / ٨..١٠ */
   const dotRange=/(?:^|\s)(\d{1,2})\s*\.\s*\.?\s*(\d{1,2})\s*(صباح(?:ا|ً)?|مساء(?:ا|ً)?|ظهر(?:ا|ً)?|عصر(?:ا|ً)?|ليل(?:ا|ً)?|ص|م|ظ|ع|ز|am|pm)?(?=\s*$)/i;
   let dr=raw.match(dotRange);
@@ -423,91 +432,109 @@ const colonRange=new RegExp(COLONNUM+"\s*:\s*"+COLONNUM+"\s*("+P+")?","i");
   return null;
 }
 
-function extractTeacherTime(text, teacherName){
-  let raw=String(text||'');
-  let nraw=norm(raw);
-  let tn=norm(teacherName||'');
-  let rest='';
-
-  /* نبحث عن اسم المعلمة داخل نفس السطر، مع السماح بأن يكون قبله رقم/شرطة/شرطة سفلية،
-     أو أن يكون الاسم مكتوبًا مختصرًا (الاسم الأول فقط). ثم نقرأ الوقت بعد الاسم فقط. */
-  if(tn && nraw.includes(tn)){
-    let pos=nraw.indexOf(tn);
-    rest=raw.slice(pos + teacherName.length);
-  }else if(tn){
-    let first=norm((teacherName||'').trim().split(/\s+/)[0]);
-    if(first && nraw.includes(first)){
-      let pos=nraw.indexOf(first);
-      rest=raw.slice(pos + (teacherName.trim().split(/\s+/)[0]||'').length);
+function normalizedTextWithMap(value){
+  const raw=String(value||"");
+  let text="",map=[];
+  for(let i=0;i<raw.length;i++){
+    const part=raw[i].normalize("NFKC").replace(/[أإآ]/g,"ا").replace(/ة/g,"ه").replace(/ى/g,"ي")
+      .replace(/[ًٌٍَُِّْـ]/g,"").toLowerCase();
+    for(let j=0;j<part.length;j++){
+      const ch=part[j];
+      if(/\s/.test(ch)){
+        if(text && !text.endsWith(" ")){text+=" ";map.push(i);}
+      }else{text+=ch;map.push(i);}
     }
   }
-
-  /* إزالة أي بقايا فاصل/رقم ترتيب بين الاسم والوقت. */
-  rest=rest.replace(/^[\s\-–—_./\\:：*#()（）]+/,'').trim();
+  while(text.startsWith(" ")){text=text.slice(1);map.shift();}
+  while(text.endsWith(" ")){text=text.slice(0,-1);map.pop();}
+  return {text,map};
+}
+function findNormalizedSpan(raw,needle){
+  const mapped=normalizedTextWithMap(raw),target=norm(needle);
+  if(!target)return null;
+  const index=mapped.text.indexOf(target);
+  if(index<0)return null;
+  return {start:mapped.map[index],end:mapped.map[index+target.length-1]+1};
+}
+function extractTeacherTime(text, teacherName){
+  const raw=String(text||"");
+  let span=findNormalizedSpan(raw,teacherName);
+  if(!span){
+    const first=(teacherName||"").trim().split(/\s+/)[0]||"";
+    span=findNormalizedSpan(raw,first);
+  }
+  let rest=span?raw.slice(span.end):raw;
+  /* إزالة فاصل ورقم ترتيب فقط بعد الاسم؛ لا نستخدم موضعًا من نص مطبّع لقص النص الأصلي. */
+  rest=rest.replace(/^[\s\-–—_./\\:：*#()（）]+/,"").trim();
   return extractTimes(rest);
 }
 
 function teacherMatch(text){
-let n=norm(text), exact=[];
-for(const t of teachers){
-let tn=norm(t.name);
-if(n.includes(tn))exact.push(t);
+const n=norm(text);
+const hasToken=(haystack,needle)=>{
+  if(!needle)return false;
+  let from=0,index;
+  while((index=haystack.indexOf(needle,from))!==-1){
+    const before=index>0?haystack[index-1]:"";
+    const after=haystack[index+needle.length]||"";
+    if(!/[ء-ي]/.test(before)&&!/[ء-ي]/.test(after))return true;
+    from=index+1;
+  }
+  return false;
+};
+/* عند تداخل الأسماء نختار الاسم الكامل الأطول، لا أول قالب في القائمة. */
+const exact=teachers.filter(t=>hasToken(n,norm(t.name)))
+  .sort((a,b)=>norm(b.name).length-norm(a.name).length);
+if(exact.length){
+  const longest=norm(exact[0].name).length;
+  const best=exact.filter(t=>norm(t.name).length===longest);
+  if(best.length===1)return best[0];
+  return {ambiguous:true,names:best.map(x=>x.name)};
 }
-if(exact.length===1)return exact[0];
-if(exact.length>1)return {ambiguous:true,names:exact.map(x=>x.name)};
 
-/* Match a shortened teacher name when two or more leading name words uniquely identify a saved template.
-   Example: "فاطمة محمد" should match "فاطمة محمد علي", but remain ambiguous if another template shares that prefix. */
-let prefixMatches=[], longestPrefix=1;
+/* الاسم المختصر المكوّن من كلمتين أو أكثر: نختار أطول بادئة مطابقة. */
+let prefixMatches=[],longestPrefix=1;
 for(const t of teachers){
   const parts=norm(t.name).split(" ").filter(Boolean);
   for(let count=2;count<=parts.length;count++){
     const prefix=parts.slice(0,count).join(" ");
-    if(n.includes(prefix)){
+    if(hasToken(n,prefix)){
       if(count>longestPrefix){longestPrefix=count;prefixMatches=[t];}
-      else if(count===longestPrefix && !prefixMatches.some(x=>x.id===t.id))prefixMatches.push(t);
+      else if(count===longestPrefix&&!prefixMatches.some(x=>x.id===t.id))prefixMatches.push(t);
     }
   }
 }
 if(prefixMatches.length===1)return prefixMatches[0];
 if(prefixMatches.length>1)return {ambiguous:true,names:prefixMatches.map(x=>x.name)};
 
-/* الاسم الأول وحده يكفي إذا كان مميزًا بين جميع قوالب المعلمات. */
-const inputWords=n.split(/[\s،,؛:：()（）]+/).filter(Boolean);
-let firstNameMatches=[];
-for(const t of teachers){
-  const first=norm(t.name).split(" ")[0];
-  if(first && inputWords.includes(first) && !firstNameMatches.some(x=>x.id===t.id))firstNameMatches.push(t);
-}
+/* الاسم الأول وحده يُقبل فقط إذا كان فريدًا بين جميع المعلمات. */
+const firstNameMatches=teachers.filter(t=>hasToken(n,norm(t.name).split(" ")[0]));
 if(firstNameMatches.length===1)return firstNameMatches[0];
 if(firstNameMatches.length>1)return {ambiguous:true,names:firstNameMatches.map(x=>x.name)};
 
-let candidates=[];
-for(const t of teachers){
-let first=norm(t.name).split(" ")[0];
-if(first&&new RegExp("(^|\\s|[-–—])"+first+"($|\\s|[-–—])").test(n))candidates.push(t);
-}
-if(candidates.length===1)return candidates[0];
-if(candidates.length>1)return {ambiguous:true,names:candidates.map(x=>x.name)};
-/* fuzzy first name: handles مرفت/ميرفت and small spelling differences */
+/* احتفاظ بالمطابقة التقريبية السابقة للأخطاء الإملائية البسيطة. */
 function lev(a,b){
-let d=Array.from({length:b.length+1},(_,i)=>i);
-for(let i=0;i<a.length;i++){
-let nd=[i+1];
-for(let j=0;j<b.length;j++)nd.push(Math.min(nd[j]+1,d[j+1]+1,d[j]+(a[i]===b[j]?0:1)));
-d=nd;
-}return d[b.length]
+  let d=Array.from({length:b.length+1},(_,i)=>i);
+  for(let i=0;i<a.length;i++){
+    let nd=[i+1];
+    for(let j=0;j<b.length;j++)nd.push(Math.min(nd[j]+1,d[j+1]+1,d[j]+(a[i]===b[j]?0:1)));
+    d=nd;
+  }
+  return d[b.length];
 }
-let words=n.split(/\s+/).filter(w=>w.length>=3), best=[], min=99;
+const words=n.split(/\s+/).filter(w=>w.length>=3);
+let best=[],min=99;
 for(const t of teachers){
-let f=norm(t.name).split(" ")[0];
-for(const w of words){
-let z=lev(w,f);
-if(z<min){min=z;best=[t]}else if(z===min)best.push(t)
+  const first=norm(t.name).split(" ")[0];
+  for(const word of words){
+    const distance=lev(word,first);
+    if(distance<min){min=distance;best=[t];}
+    else if(distance===min&&!best.some(x=>x.id===t.id))best.push(t);
+  }
 }
-}
-if(min<=1 && best.length===1)return best[0];
-return null
+if(min<=1&&best.length===1)return best[0];
+if(min<=1&&best.length>1)return {ambiguous:true,names:best.map(x=>x.name)};
+return null;
 }
 
 function removeEmojisAndDecorations(s){
@@ -680,6 +707,22 @@ if(i+d<lines.length){t=teacherMatch(lines[i+d]);if(t)return t}
 }
 return null
 }
+function renderSchedulePreview(){
+  const box=document.getElementById("schedulePreview");
+  if(!box)return;
+  if(!schedule.length){box.innerHTML="";box.style.display="none";return;}
+  const duration=Math.max(1,Number(examDuration)||5);
+  box.style.display="block";
+  box.innerHTML=
+    '<div class="schedule-preview-heading"><b>👀 المواعيد التي فهمها البرنامج — راجعيها قبل إنشاء القوائم</b>'+
+    '<span class="small">النص الأصلي بجوار النتيجة حتى يسهل اكتشاف أي اختلاف.</span></div>'+
+    '<div class="schedule-preview-scroll"><table class="schedule-preview-table"><thead><tr>'+
+    '<th>المعلمة</th><th>الموعد المكتوب</th><th>من</th><th>إلى</th><th>السعة</th>'+
+    '</tr></thead><tbody>'+
+    schedule.map(slot=>'<tr><td><b>'+esc(slot.teacherName)+'</b></td><td>'+esc(slot.sourceLine||"")+
+      '</td><td>'+fmt(slot.start)+'</td><td>'+fmt(slot.end)+'</td><td>'+Math.floor((slot.end-slot.start)/duration)+'</td></tr>').join("")+
+    '</tbody></table></div>';
+}
 function parseSchedule(){
 schedule=[]; scheduleIssues=[];
 let lines=document.getElementById("scheduleInput").value.split(/\r?\n/).map(x=>x.trim());
@@ -716,7 +759,7 @@ for(let i=0;i<lines.length;i++){
     if(!r){scheduleIssues.push({line:i,text:lines[i],reason:"تعرفت على المعلمة لكن لم أفهم وقتها."});continue;}
   }
   if(t.ambiguous){scheduleIssues.push({line:i,text:lines[i],reason:"اسم المعلمة مطابق لأكثر من قالب."});continue;}
-  schedule.push({teacherId:t.id,teacherName:t.name,start:r.start,end:r.end,explicit:r.explicit});
+  schedule.push({teacherId:t.id,teacherName:t.name,start:r.start,end:r.end,explicit:r.explicit,sourceLine:line});
   if(consumedNextLine) i++;
 }
 for(const s of schedule){let dur=s.end-s.start;if(dur<60){s.end=s.start+60;dur=60;}if(dur>120){s.end=s.start+120;dur=120;}}
@@ -724,6 +767,7 @@ renderQalun();
 const uniqueTeachers=new Set(schedule.map(s=>s.teacherId)).size,totalMin=schedule.reduce((a,s)=>a+s.end-s.start,0);
 const st=document.getElementById("scheduleStats"); if(st){st.style.display=schedule.length?"grid":"none";st.innerHTML=`<div class="stat"><b>${schedule.length}</b>موعد</div><div class="stat"><b>${uniqueTeachers}</b>معلمة</div><div class="stat"><b>${Math.floor(totalMin/60)}س ${totalMin%60?totalMin%60+"د":""}</b>إجمالي الوقت</div><div class="stat"><b>${schedule.reduce((a,s)=>a+Math.floor((s.end-s.start)/examDuration),0)}</b>سعة الطالبات</div>`}
 renderScheduleIssues();
+renderSchedulePreview();
 if(!schedule.length)setParseStatus("scheduleStatus","bad","❌ لم يتم فصل أي موعد. تأكدي من اسم المعلمة ووجود الوقت في نفس السطر.");
 else if(scheduleIssues.length)setParseStatus("scheduleStatus","warn","⚠️ تم فصل "+schedule.length+" موعد، لكن يوجد "+scheduleIssues.length+" سطر يحتاج مراجعة. يمكنك إصلاحه من أسفل التحليل.");
 else setParseStatus("scheduleStatus","ok","✓ تم تحليل المواعيد بنجاح — تم تجاهل كل ما قبل أول موعد صالح والخانات الفارغة.");
