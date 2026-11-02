@@ -269,11 +269,16 @@ function setupAutosave(){["studentsInput","scheduleInput"].forEach(id=>{let el=d
 
 function save(){localStorage.setItem(KEY,JSON.stringify(teachers))}
 function meridiemKind(p){
-  p=String(p||"").toLowerCase().replace(/[ًٌٍَُِّْ]/g,"").trim();
+  p=String(p||"").toLowerCase()
+    .replace(/[أإآ]/g,"ا")
+    .replace(/[ًٌٍَُِّْـ]/g,"")
+    .replace(/\s+/g,"")
+    .replace(/^ال/,"");
   if(!p)return "";
-  if(/^(ص|صباح|صباحا|am)$/.test(p))return "am";
-  /* ظ/ظهر/ع/عصر/م/مساء/ل/ليل كلها تُعامل كمساء */
-  if(/^(م|مساء|مساءا|ظ|ظهرا|ظهر|ع|عصرا|عصر|ز|ليلا|ليل|pm)$/.test(p))return "pm";
+  /* كل صيغ الصباح تُوحّد إلى ص، بما فيها الصبح والصباح. */
+  if(/^(ص|صباح|صباحا|صبح|am)$/.test(p))return "am";
+  /* الظهر والعصر والمساء والاختصارات ظ/ع/م كلها تُوحّد إلى م. */
+  if(/^(م|مساء|مساءا|ظهر|ظهرا|عصر|عصرا|ظ|ع|pm)$/.test(p))return "pm";
   return "";
 }
 function timeToMin(v,p){
@@ -311,6 +316,10 @@ function extractTimes(text){
     .replace(/[–—−]/g,"-")
     .trim();
   raw=digits(raw);
+  /* توحيد دلالة الوقت قبل استخراجه: صباح/الصبح = ص، وظهر/العصر/المساء = م.
+     يشمل ذلك الكلمات المكتوبة متصلة بالرقم مثل ٧م و١١مساءا. */
+  raw=raw.replace(/(\d{1,2}(?:\s*[.:]\s*(?:00|30))?)\s*(الصباح|الصبح|صباحا?|المساء|مساءا?|الظهر|ظهرا?|العصر|عصرا?|ص|م|ظ|ع|am|pm)(?=$|[^ء-يA-Za-z])/gi,
+    (whole,num,suffix)=>num+" "+(meridiemKind(suffix)==="am"?"ص":"م"));
   /* مدى مباشر بالنقطة أو النقطتين: 8.10 / ٨.١٠ / 8..10 / ٨..١٠ */
   const dotRange=/(?:^|\s)(\d{1,2})\s*\.\s*\.?\s*(\d{1,2})\s*(صباح(?:ا|ً)?|مساء(?:ا|ً)?|ظهر(?:ا|ً)?|عصر(?:ا|ً)?|ليل(?:ا|ً)?|ص|م|ظ|ع|ز|am|pm)?(?=\s*$)/i;
   let dr=raw.match(dotRange);
@@ -339,7 +348,7 @@ function extractTimes(text){
   /* أولًا: المدى المكتوب بالنقطتين أو إلى/حتى/الشرطة.
      النقطتان هنا مقصودهما 9:10 = 9 إلى 10، لا 9:10 دقيقة. */
     /* 11:30 و10:00 = وقت بالساعة والدقائق. أما 9:10 و8:10 فمدى زمني. */
-  const clockColon=/\b(\d{1,2})\s*:\s*(00|30)\s*(صباح(?:ا|ً)?|مساء(?:ا|ً)?|ظهر(?:ا|ً)?|عصر(?:ا|ً)?|ليل(?:ا|ً)?|ص|م|ظ|ع|ز|am|pm)?\b/i;
+  const clockColon=/(?:^|[^0-9])(\d{1,2})\s*:\s*(00|30)\s*(صباح(?:ا|ً)?|مساء(?:ا|ً)?|ظهر(?:ا|ً)?|عصر(?:ا|ً)?|ليل(?:ا|ً)?|ص|م|ظ|ع|ز|am|pm)?(?=$|[^ء-يA-Za-z])/i;
   let cm=raw.match(clockColon);
   if(cm){
     let a=timeToMin(cm[1]+"."+cm[2],cm[3]||"");
@@ -444,7 +453,8 @@ for(const t of teachers){
 let tn=norm(t.name);
 if(n.includes(tn))exact.push(t);
 }
-if(exact.length)return exact[0];
+if(exact.length===1)return exact[0];
+if(exact.length>1)return {ambiguous:true,names:exact.map(x=>x.name)};
 
 /* Match a shortened teacher name when two or more leading name words uniquely identify a saved template.
    Example: "فاطمة محمد" should match "فاطمة محمد علي", but remain ambiguous if another template shares that prefix. */
@@ -462,10 +472,20 @@ for(const t of teachers){
 if(prefixMatches.length===1)return prefixMatches[0];
 if(prefixMatches.length>1)return {ambiguous:true,names:prefixMatches.map(x=>x.name)};
 
+/* الاسم الأول وحده يكفي إذا كان مميزًا بين جميع قوالب المعلمات. */
+const inputWords=n.split(/[\s،,؛:：()（）]+/).filter(Boolean);
+let firstNameMatches=[];
+for(const t of teachers){
+  const first=norm(t.name).split(" ")[0];
+  if(first && inputWords.includes(first) && !firstNameMatches.some(x=>x.id===t.id))firstNameMatches.push(t);
+}
+if(firstNameMatches.length===1)return firstNameMatches[0];
+if(firstNameMatches.length>1)return {ambiguous:true,names:firstNameMatches.map(x=>x.name)};
+
 let candidates=[];
 for(const t of teachers){
 let first=norm(t.name).split(" ")[0];
-if(first&&new RegExp("(^|\s|[-–—])"+first+"($|\s|[-–—])").test(n))candidates.push(t);
+if(first&&new RegExp("(^|\\s|[-–—])"+first+"($|\\s|[-–—])").test(n))candidates.push(t);
 }
 if(candidates.length===1)return candidates[0];
 if(candidates.length>1)return {ambiguous:true,names:candidates.map(x=>x.name)};
