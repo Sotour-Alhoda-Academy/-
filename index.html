@@ -732,7 +732,12 @@ for(let i=0;i<lines.length;i++){
   const emptySlot=/^\s*[\(（]?\s*[0-9٠-٩]+\s*[\)）]?\s*[-_./\\:：]*\s*$/.test(line); if(emptySlot)continue;
   let t=teacherMatch(line), r=null;
   let consumedNextLine=false;
-  if(t && !t.ambiguous){
+  /* لا نتجاهل الاسم الملتبس حتى لو ظهر قبل أول موعد صالح؛ اعرضيه للمراجعة. */
+  if(t&&t.ambiguous){
+    scheduleIssues.push({line:i,text:lines[i],reason:"اسم المعلمة مطابق لأكثر من قالب. اختاري المعلمة الصحيحة قبل اعتماد المواعيد."});
+    continue;
+  }
+  if(t){
     r=extractTeacherTime(line,t.name);
     if(!r)r=extractTeacherTime(line,(t.name||'').trim().split(/\s+/)[0]);
 
@@ -758,7 +763,6 @@ for(let i=0;i<lines.length;i++){
     }
     if(!r){scheduleIssues.push({line:i,text:lines[i],reason:"تعرفت على المعلمة لكن لم أفهم وقتها."});continue;}
   }
-  if(t.ambiguous){scheduleIssues.push({line:i,text:lines[i],reason:"اسم المعلمة مطابق لأكثر من قالب."});continue;}
   schedule.push({teacherId:t.id,teacherName:t.name,start:r.start,end:r.end,explicit:r.explicit,sourceLine:line});
   if(consumedNextLine) i++;
 }
