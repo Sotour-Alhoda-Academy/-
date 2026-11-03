@@ -715,12 +715,12 @@ function renderSchedulePreview(){
   box.style.display="block";
   box.innerHTML=
     '<div class="schedule-preview-heading"><b>👀 المواعيد التي فهمها البرنامج — راجعيها قبل إنشاء القوائم</b>'+
-    '<span class="small">النص الأصلي بجوار النتيجة حتى يسهل اكتشاف أي اختلاف.</span></div>'+
+    '<span class="small">النص الأصلي أولًا، ثم الميعاد الذي فهمه البرنامج، ثم اسم المعلمة، وأخيرًا السعة.</span></div>'+
     '<div class="schedule-preview-scroll"><table class="schedule-preview-table"><thead><tr>'+
-    '<th>المعلمة</th><th>الموعد المكتوب</th><th>من</th><th>إلى</th><th>السعة</th>'+
+    '<th>النص الأصلي</th><th>تحليل الميعاد</th><th>تحليل الاسم</th><th>السعة</th>'+
     '</tr></thead><tbody>'+
-    schedule.map(slot=>'<tr><td><b>'+esc(slot.teacherName)+'</b></td><td>'+esc(slot.sourceLine||"")+
-      '</td><td>'+fmt(slot.start)+'</td><td>'+fmt(slot.end)+'</td><td>'+Math.floor((slot.end-slot.start)/duration)+'</td></tr>').join("")+
+    schedule.map(slot=>'<tr><td>'+esc(slot.sourceLine||"")+
+      '</td><td>'+fmt(slot.start)+' - '+fmt(slot.end)+'</td><td><b>'+esc(slot.teacherName)+'</b></td><td>'+Math.floor((slot.end-slot.start)/duration)+'</td></tr>').join("")+
     '</tbody></table></div>';
 }
 function parseSchedule(){
