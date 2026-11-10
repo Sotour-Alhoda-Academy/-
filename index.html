@@ -627,6 +627,7 @@ let lastNumberedStudent=null,allowContinuation=false,started=false;
 lines.forEach((l,idx)=>{
   const raw=l.trim();
   if(!raw){ lastNumberedStudent=null; allowContinuation=false; return; }
+  if(/كتب الله|اجركم|نفعكم|عنفاعكم|بالقران/.test(norm(raw)))return;
   const hasNumber=/^\s*[\*🎀👑🌷🪷🌸]*\s*[\(（]?[0-9٠-٩]+\s*[\)）\]]?\s*(?:[🌷🎀👑🪷🌸🌺🌼🌿🫂\/\\._\-–—*:：]|\s)*/.test(raw) && /^\s*[\*🎀👑🌷🪷🌸]*\s*[\(（]?[0-9٠-٩]+/.test(raw);
   if(!started && !hasNumber)return;
   if(hasNumber){
